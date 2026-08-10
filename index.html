@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pencarian Data Siswa - UPTD SPF SMP Negeri 1 Bondowoso</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- jsPDF & AutoTable CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <!-- SheetJS (XLSX) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f3f4f6;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-gray-800">
+
+  <!-- OVERLAY LOADING (z-index: 9999) -->
+  <div id="loadingOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex-col items-center justify-center text-white" style="z-index: 9999;">
+    <div class="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mb-4"></div>
+    <p class="font-medium text-lg" id="loadingText">Mencari data siswa...</p>
+  </div>
+
+  <!-- TOAST CONTAINER (z-index: 2000) -->
+  <div id="toastContainer" class="fixed top-5 right-5 space-y-3" style="z-index: 2000;"></div>
+
+  <!-- MAIN CONTAINER -->
+  <div class="max-w-4xl mx-auto w-full p-4 md:p-6 flex-grow">
+    
+    <!-- CARD CONTAINER -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+      
+      <!-- KOP SEKOLAH HEADER (Google Drive Hosted Image) -->
+      <div class="p-3 md:p-5 bg-white border-b-4 border-double border-gray-900 flex justify-center items-center">
+        <div class="w-full max-w-3xl flex flex-col items-center justify-center">
+          <img src="https://lh3.googleusercontent.com/d/118AwlcPy5cUV8qKCvjlhJmabX4p8iweM" 
+               alt="Kop Resmi UPTD SPF SMP Negeri 1 Bondowoso" 
+               class="w-full max-w-3xl h-auto object-contain mx-auto" 
+               onerror="this.onerror=null; this.src='https://drive.google.com/thumbnail?id=118AwlcPy5cUV8qKCvjlhJmabX4p8iweM&sz=w1200'; this.onerror=function(){ this.style.display='none'; document.getElementById('fallbackKop').classList.remove('hidden'); };" />
+
+          <!-- Tampilan Cadangan jika Gambar Mengalami Kendala Akses -->
+          <div id="fallbackKop" class="hidden w-full flex items-center justify-between border-b-2 border-black pb-2 px-2 text-center">
+            <div class="hidden sm:block w-16 h-16 flex-shrink-0">
+              <div class="w-16 h-16 rounded-full bg-yellow-400 border-2 border-green-700 flex items-center justify-center font-bold text-xs text-green-900">
+                <i class="fa-solid fa-shield-halved text-2xl text-green-800"></i>
+              </div>
+            </div>
+            <div class="flex-grow px-2">
+              <h3 class="text-xs sm:text-sm font-bold tracking-wider text-gray-900 uppercase">PEMERINTAH KABUPATEN BONDOWOSO</h3>
+              <h3 class="text-xs sm:text-sm font-bold tracking-wider text-gray-900 uppercase">DINAS PENDIDIKAN</h3>
+              <h1 class="text-base sm:text-xl font-extrabold text-blue-900 uppercase tracking-tight my-0.5">UPTD SPF SMP NEGERI 1 BONDOWOSO</h1>
+              <p class="text-[10px] sm:text-xs text-gray-700">Jalan Letnan Karsono No. 3, Blindungan, Bondowoso, Jawa Timur; 68212</p>
+              <p class="text-[10px] sm:text-xs text-gray-700">Telpon / Fax ( 0332 ) 421244 ; Email : smpn1bws@yahoo.co.id</p>
+            </div>
+            <div class="hidden sm:block w-16 h-16 flex-shrink-0">
+              <div class="w-16 h-16 rounded-full bg-blue-900 border-2 border-yellow-400 flex items-center justify-center font-bold text-xs text-yellow-400">
+                <i class="fa-solid fa-graduation-cap text-2xl"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BANNER INFORMASI -->
+      <div class="bg-blue-50 border-l-4 border-blue-600 p-4 mx-4 md:mx-6 mt-6 rounded-r">
+        <div class="flex items-start">
+          <i class="fa-solid fa-circle-info text-blue-600 text-lg mt-0.5 mr-3"></i>
+          <div>
+            <h4 class="font-semibold text-blue-900 text-sm">Layanan Pencarian Data Siswa Resmi</h4>
+            <p class="text-xs text-blue-700 mt-0.5">Pilih kategori pencarian (NIS, NISN, atau Nama) lalu masukkan kata kunci untuk menampilkan informasi data siswa lengkap.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORM PENCARIAN -->
+      <div class="p-4 md:p-6">
+        <form id="searchForm" class="space-y-4" onsubmit="event.preventDefault(); handleSearch();">
+          
+          <!-- Pilihan Kategori (Diperbarui: NIS, NISN, Nama) -->
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Kategori Pencarian:</label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label class="flex items-center p-2.5 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-blue-50 transition">
+                <input type="radio" name="searchCategory" value="nis" checked class="w-4 h-4 text-blue-600 focus:ring-blue-500">
+                <span class="ml-2 text-xs font-semibold text-gray-700"><i class="fa-solid fa-id-card mr-1.5 text-gray-400"></i> NIS</span>
+              </label>
+              <label class="flex items-center p-2.5 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-blue-50 transition">
+                <input type="radio" name="searchCategory" value="nisn" class="w-4 h-4 text-blue-600 focus:ring-blue-500">
+                <span class="ml-2 text-xs font-semibold text-gray-700"><i class="fa-solid fa-hashtag mr-1.5 text-gray-400"></i> NISN</span>
+              </label>
+              <label class="flex items-center p-2.5 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-blue-50 transition">
+                <input type="radio" name="searchCategory" value="nama" class="w-4 h-4 text-blue-600 focus:ring-blue-500">
+                <span class="ml-2 text-xs font-semibold text-gray-700"><i class="fa-solid fa-user mr-1.5 text-gray-400"></i> Nama Siswa</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Input Kata Kunci -->
+          <div class="flex flex-col sm:flex-row gap-2">
+            <div class="relative flex-grow">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </div>
+              <input type="text" id="searchInput" required placeholder="Masukkan kata kunci pencarian..." 
+                class="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+            </div>
+            <button type="submit" class="px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm">
+              <i class="fa-solid fa-magnifying-glass"></i> Cari Data
+            </button>
+            <button type="button" onclick="resetSearch()" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition flex items-center justify-center text-sm" title="Reset">
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      <!-- HASIL PENCARIAN AREA -->
+      <div id="resultArea" class="p-4 md:p-6 border-t border-gray-100 hidden">
+        
+        <!-- HEADER HASIL & AKSI EXPORT -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-200">
+          <div>
+            <h3 class="text-base font-bold text-gray-800">Hasil Pencarian</h3>
+            <p id="resultCount" class="text-xs text-gray-500">Ditemukan 0 data</p>
+          </div>
+          <div id="exportButtons" class="hidden flex gap-2">
+            <button onclick="exportToExcel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Excel
+            </button>
+            <button onclick="exportToPDF()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded transition flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-file-pdf"></i> PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- TAMPILAN CARD SISWA TUNGGAL (NIS / NISN) -->
+        <div id="singleStudentCard" class="hidden max-w-2xl mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-sm">
+          <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start">
+            
+            <!-- Foto Siswa -->
+            <div class="flex-shrink-0 text-center">
+              <div class="w-32 h-40 bg-gray-200 rounded-lg overflow-hidden shadow border-2 border-white relative group">
+                <img id="studentPhoto" src="" alt="Foto Siswa" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/150x200?text=Tidak+Ada+Foto'">
+              </div>
+            </div>
+
+            <!-- Detail Informasi Lengkap (9 Atribut) -->
+            <div class="flex-grow w-full space-y-2.5">
+              <div class="border-b border-blue-200 pb-2">
+                <span class="text-[10px] uppercase font-bold tracking-wider text-blue-600">Nama Lengkap</span>
+                <h4 id="studentNama" class="text-lg font-bold text-gray-900 leading-tight"></h4>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span class="text-gray-500 font-medium block">NIS</span>
+                  <span id="studentNis" class="font-bold text-gray-800"></span>
+                </div>
+                <div>
+                  <span class="text-gray-500 font-medium block">NISN</span>
+                  <span id="studentNisn" class="font-bold text-gray-800"></span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span class="text-gray-500 font-medium block">Agama</span>
+                  <span id="studentAgama" class="font-semibold text-gray-800"></span>
+                </div>
+                <div>
+                  <span class="text-gray-500 font-medium block">Tempat Lahir</span>
+                  <span id="studentTempatLahir" class="font-semibold text-gray-800"></span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span class="text-gray-500 font-medium block">Tanggal Lahir</span>
+                  <span id="studentTanggalLahir" class="font-semibold text-gray-800"></span>
+                </div>
+                <div>
+                  <span class="text-gray-500 font-medium block">Kelas Saat Ini</span>
+                  <span id="studentKelasText" class="font-bold text-blue-900"></span>
+                </div>
+              </div>
+
+              <div class="text-xs pt-1">
+                <span class="text-gray-500 font-medium block">Alamat Rumah</span>
+                <span id="studentAlamat" class="font-semibold text-gray-800 leading-snug"></span>
+              </div>
+
+              <div class="pt-3 flex justify-end">
+                <button onclick="printStudentCard()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition flex items-center gap-1 shadow">
+                  <i class="fa-solid fa-print"></i> Cetak Kartu Data
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAMPILAN TABEL MULTI DATA (NAMA) -->
+        <div id="multiStudentTable" class="hidden overflow-x-auto rounded-lg border border-gray-200">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-100 text-gray-700 uppercase font-bold border-b border-gray-200">
+                <th class="p-3 text-center">No</th>
+                <th class="p-3">NIS</th>
+                <th class="p-3">NISN</th>
+                <th class="p-3">Nama Lengkap</th>
+                <th class="p-3">Agama</th>
+                <th class="p-3">Kelas</th>
+                <th class="p-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="studentTableBody" class="divide-y divide-gray-200 bg-white">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- MODAL DETAIL SISWA (z-index: 1000) -->
+  <div id="studentModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 1000;">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all">
+      <div class="bg-blue-900 text-white p-4 flex justify-between items-center">
+        <h3 class="font-bold text-sm flex items-center gap-2">
+          <i class="fa-solid fa-id-card"></i> Detail Lengkap Siswa
+        </h3>
+        <button onclick="closeModal()" class="text-white hover:text-gray-300 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-5" id="modalContent"></div>
+      <div class="bg-gray-50 px-5 py-3 flex justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-semibold rounded-lg">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500 mt-8">
+    <p>© 2026 UPTD SPF SMP Negeri 1 Bondowoso. Hak Cipta Dilindungi.</p>
+  </footer>
+
+  <!-- JAVASCRIPT INTEGRATION BACKEND -->
+  <script>
+    // KONSTANTA URL WEB APP GOOGLE APPS SCRIPT
+    const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoySVMbx4126OS5pWpO_GkBJjvtrpiNyZgFDJ_fmQA_Gpzj09-PsXEWVffQHf19V9Bfg/exec";
+
+    let currentSearchResults = [];
+
+    // CUSTOM TOAST NOTIFICATION
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const bgColors = {
+        success: 'bg-emerald-600',
+        error: 'bg-rose-600',
+        info: 'bg-blue-600',
+        warning: 'bg-amber-600'
+      };
+
+      const icons = {
+        success: 'fa-circle-check',
+        error: 'fa-triangle-exclamation',
+        info: 'fa-circle-info',
+        warning: 'fa-circle-exclamation'
+      };
+
+      toast.className = `${bgColors[type] || 'bg-gray-800'} text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all transform translate-x-full duration-300 max-w-md text-xs font-medium`;
+      toast.innerHTML = `
+        <i class="fa-solid ${icons[type]} text-base"></i>
+        <div class="flex-grow">${message}</div>
+        <button onclick="this.parentElement.remove()" class="hover:opacity-75"><i class="fa-solid fa-xmark"></i></button>
+      `;
+
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-x-full'), 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-full');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // OVERLAY LOADING CONTROLLER
+    function toggleLoading(show, message = 'Mencari data siswa...') {
+      const overlay = document.getElementById('loadingOverlay');
+      const text = document.getElementById('loadingText');
+      text.innerText = message;
+      if (show) {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+      } else {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    }
+
+    function fetchJSONP(url, params = {}) {
+      return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_cb_' + Math.random().toString(36).substring(2, 9);
+        const script = document.createElement('script');
+        
+        const timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error("JSONP Request Timeout"));
+        }, 12000);
+
+        function cleanup() {
+          if (script.parentNode) script.parentNode.removeChild(script);
+          delete window[callbackName];
+          clearTimeout(timeoutId);
+        }
+
+        window[callbackName] = function(data) {
+          cleanup();
+          resolve(data);
+        };
+
+        script.onerror = function(err) {
+          cleanup();
+          reject(new Error("JSONP Script Load Error"));
+        };
+
+        const queryParams = new URLSearchParams(params);
+        queryParams.set('callback', callbackName);
+
+        const separator = url.includes('?') ? '&' : '?';
+        script.src = `${url}${separator}${queryParams.toString()}`;
+        document.body.appendChild(script);
+      });
+    }
+
+    async function handleSearch() {
+      const category = document.querySelector('input[name="searchCategory"]:checked').value;
+      const keyword = document.getElementById('searchInput').value.trim();
+
+      if (!keyword) {
+        showToast("Silakan masukkan kata kunci pencarian!", "warning");
+        return;
+      }
+
+      toggleLoading(true, "Menghubungkan ke Google Sheets...");
+
+      try {
+        let result = null;
+
+        // 1. Request GET
+        try {
+          const getUrl = `${APP_SCRIPT_URL}?action=search&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}`;
+          const response = await fetch(getUrl, { method: "GET", redirect: "follow" });
+          if (response.ok) {
+            result = await response.json();
+          }
+        } catch (getErr) {
+          console.warn("GET fetch gagal, mencoba POST fallback...", getErr);
+        }
+
+        // 2. Request POST
+        if (!result) {
+          try {
+            const response = await fetch(APP_SCRIPT_URL, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({ action: "search", category, keyword }),
+              redirect: "follow"
+            });
+
+            if (response.ok) {
+              result = await response.json();
+            }
+          } catch (postErr) {
+            console.warn("POST fetch gagal, mencoba JSONP fallback...", postErr);
+          }
+        }
+
+        // 3. Fallback JSONP
+        if (!result) {
+          try {
+            result = await fetchJSONP(APP_SCRIPT_URL, {
+              action: "search",
+              category: category,
+              keyword: keyword
+            });
+          } catch (jsonpErr) {
+            console.warn("JSONP fallback gagal...", jsonpErr);
+          }
+        }
+
+        toggleLoading(false);
+
+        if (result && result.success) {
+          currentSearchResults = result.data || [];
+          displayResults(currentSearchResults, category);
+        } else if (result && !result.success) {
+          showToast(result.message || "Gagal mengambil data dari server.", "error");
+        } else {
+          showToast("Gagal terhubung ke Google Apps Script. Lakukan 'Manage Deployments -> New Version' pada GAS.", "error");
+        }
+
+      } catch (error) {
+        toggleLoading(false);
+        console.error("Fetch Error:", error);
+        showToast("Gagal terhubung ke Google Apps Script.", "error");
+      }
+    }
+
+    // TAMPILKAN HASIL
+    function displayResults(data, category) {
+      const resultArea = document.getElementById('resultArea');
+      const resultCount = document.getElementById('resultCount');
+      const singleCard = document.getElementById('singleStudentCard');
+      const multiTable = document.getElementById('multiStudentTable');
+      const exportButtons = document.getElementById('exportButtons');
+
+      resultArea.classList.remove('hidden');
+
+      if (!data || data.length === 0) {
+        singleCard.classList.add('hidden');
+        multiTable.classList.add('hidden');
+        exportButtons.classList.add('hidden');
+        resultCount.innerText = "Ditemukan 0 data";
+        showToast("Data siswa tidak ditemukan.", "error");
+        return;
+      }
+
+      resultCount.innerText = `Ditemukan ${data.length} data siswa`;
+      showToast(`Pencarian berhasil. Ditemukan ${data.length} data.`, "success");
+
+      if (data.length === 1 && (category === 'nis' || category === 'nisn')) {
+        renderSingleCard(data[0]);
+        singleCard.classList.remove('hidden');
+        multiTable.classList.add('hidden');
+        exportButtons.classList.add('hidden');
+      } else {
+        renderTable(data);
+        multiTable.classList.remove('hidden');
+        singleCard.classList.add('hidden');
+        exportButtons.classList.remove('hidden');
+      }
+    }
+
+    function renderSingleCard(student) {
+      document.getElementById('studentNama').innerText = student.nama || '-';
+      document.getElementById('studentNis').innerText = student.nis || '-';
+      document.getElementById('studentNisn').innerText = student.nisn || '-';
+      document.getElementById('studentAgama').innerText = student.agama || '-';
+      document.getElementById('studentTempatLahir').innerText = student.tempat_lahir || '-';
+      document.getElementById('studentTanggalLahir').innerText = student.tanggal_lahir || '-';
+      document.getElementById('studentKelasText').innerText = `Kelas ${student.kelas || '-'}`;
+      document.getElementById('studentAlamat').innerText = student.alamat || '-';
+      document.getElementById('studentPhoto').src = student.foto || 'https://via.placeholder.com/150x200?text=Tidak+Ada+Foto';
+    }
+
+    function renderTable(students) {
+      const tbody = document.getElementById('studentTableBody');
+      tbody.innerHTML = '';
+
+      students.forEach((s, index) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-blue-50/50 transition";
+        tr.innerHTML = `
+          <td class="p-3 text-center font-semibold text-gray-500">${index + 1}</td>
+          <td class="p-3 font-semibold text-gray-800">${s.nis || '-'}</td>
+          <td class="p-3 text-gray-600">${s.nisn || '-'}</td>
+          <td class="p-3 font-bold text-blue-900">${s.nama || '-'}</td>
+          <td class="p-3 text-gray-700">${s.agama || '-'}</td>
+          <td class="p-3"><span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-semibold text-[11px]">Kelas ${s.kelas || '-'}</span></td>
+          <td class="p-3 text-center">
+            <button onclick="openDetailModal('${s.nis}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-[11px] shadow-sm transition flex items-center gap-1 mx-auto">
+              <i class="fa-solid fa-eye"></i> Detail
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openDetailModal(nis) {
+      const student = currentSearchResults.find(s => s.nis === nis);
+      if (!student) return;
+
+      const modalContent = document.getElementById('modalContent');
+      modalContent.innerHTML = `
+        <div class="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+          <img src="${student.foto || 'https://via.placeholder.com/150x200?text=Tidak+Ada+Foto'}" class="w-28 h-36 object-cover rounded-lg shadow border" onerror="this.src='https://via.placeholder.com/150x200?text=Tidak+Ada+Foto'">
+          <div class="space-y-2 text-xs w-full">
+            <div>
+              <span class="text-gray-500 block">Nama Lengkap:</span>
+              <span class="font-bold text-sm text-gray-900">${student.nama || '-'}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <span class="text-gray-500 block">NIS:</span>
+                <span class="font-semibold text-gray-800">${student.nis || '-'}</span>
+              </div>
+              <div>
+                <span class="text-gray-500 block">NISN:</span>
+                <span class="font-semibold text-gray-800">${student.nisn || '-'}</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <span class="text-gray-500 block">Agama:</span>
+                <span class="font-semibold text-gray-800">${student.agama || '-'}</span>
+              </div>
+              <div>
+                <span class="text-gray-500 block">Kelas Saat Ini:</span>
+                <span class="font-semibold text-blue-700">Kelas ${student.kelas || '-'}</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <span class="text-gray-500 block">Tempat Lahir:</span>
+                <span class="font-semibold text-gray-800">${student.tempat_lahir || '-'}</span>
+              </div>
+              <div>
+                <span class="text-gray-500 block">Tanggal Lahir:</span>
+                <span class="font-semibold text-gray-800">${student.tanggal_lahir || '-'}</span>
+              </div>
+            </div>
+            <div>
+              <span class="text-gray-500 block">Alamat Rumah:</span>
+              <span class="font-semibold text-gray-800 leading-tight block">${student.alamat || '-'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('studentModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('studentModal').classList.add('hidden');
+    }
+
+    function resetSearch() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('resultArea').classList.add('hidden');
+      showToast("Form pencarian dibersihkan.", "info");
+    }
+
+    function exportToExcel() {
+      if (currentSearchResults.length === 0) return;
+      const exportData = currentSearchResults.map(s => ({
+        "NIS": s.nis,
+        "NISN": s.nisn,
+        "Nama Lengkap": s.nama,
+        "Agama": s.agama,
+        "Tempat Lahir": s.tempat_lahir,
+        "Tanggal Lahir": s.tanggal_lahir,
+        "Alamat Rumah": s.alamat,
+        "Kelas Saat Ini": s.kelas
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data Siswa");
+      XLSX.writeFile(workbook, `data_siswa_smpn1bondowoso_${new Date().toISOString().slice(0,10)}.xlsx`);
+      showToast("File Excel berhasil diunduh!", "success");
+    }
+
+    function exportToPDF() {
+      if (currentSearchResults.length === 0) return;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(13);
+      doc.text("UPTD SPF SMP NEGERI 1 BONDOWOSO", 14, 15);
+      doc.setFontSize(10);
+      doc.text("Laporan Hasil Pencarian Data Siswa", 14, 22);
+
+      const tableData = currentSearchResults.map((s, index) => [
+        index + 1,
+        s.nis,
+        s.nisn,
+        s.nama,
+        s.agama,
+        `${s.tempat_lahir}, ${s.tanggal_lahir}`,
+        s.kelas
+      ]);
+
+      doc.autoTable({
+        startY: 28,
+        head: [['No', 'NIS', 'NISN', 'Nama Lengkap', 'Agama', 'TTL', 'Kelas']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [30, 58, 138] }
+      });
+
+      doc.save(`data_siswa_smpn1bondowoso_${new Date().toISOString().slice(0,10)}.pdf`);
+      showToast("File PDF berhasil diunduh!", "success");
+    }
+
+    function printStudentCard() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a5'
+      });
+
+      const nama = document.getElementById('studentNama').innerText;
+      const nis = document.getElementById('studentNis').innerText;
+      const nisn = document.getElementById('studentNisn').innerText;
+      const agama = document.getElementById('studentAgama').innerText;
+      const tempatLahir = document.getElementById('studentTempatLahir').innerText;
+      const tanggalLahir = document.getElementById('studentTanggalLahir').innerText;
+      const kelas = document.getElementById('studentKelasText').innerText;
+      const alamat = document.getElementById('studentAlamat').innerText;
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("UPTD SPF SMP NEGERI 1 BONDOWOSO", 14, 15);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Kartu Informasi Data Siswa", 14, 21);
+      doc.line(14, 24, 134, 24);
+
+      doc.setFontSize(10);
+      doc.text(`Nama Lengkap   : ${nama}`, 14, 32);
+      doc.text(`NIS / NISN     : ${nis} / ${nisn}`, 14, 40);
+      doc.text(`Agama          : ${agama}`, 14, 48);
+      doc.text(`Tempat Lahir   : ${tempatLahir}`, 14, 56);
+      doc.text(`Tanggal Lahir  : ${tanggalLahir}`, 14, 64);
+      doc.text(`Kelas Saat Ini : ${kelas}`, 14, 72);
+      doc.text(`Alamat Rumah   : ${alamat}`, 14, 80);
+
+      doc.setFontSize(8);
+      doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 95);
+
+      doc.save(`Kartu_Siswa_${nis}.pdf`);
+      showToast("Kartu Data Siswa berhasil dicetak!", "success");
+    }
+  </script>
+</body>
+</html>
